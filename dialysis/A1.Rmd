@@ -1,0 +1,197 @@
+---
+title: "ECON567_A1"
+author: "Jasmine Hao"
+date: "January 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+First load essential functions and libraries.
+Use stargazer to tabulate the data.
+```{r, message=FALSE}
+library(stargazer)
+library(plyr)
+library(ggplot2)
+library(ggthemes)
+library(plotly)
+library(plm)
+load("dialysisFacilityReports.Rdata") 
+source("functions.R")
+```
+
+#Problem 1
+Reproduce the descriptive data
+```{r,warning=FALSE}
+tab <- t( apply(dialysis , 2, descriptive.statistic))
+colnames( tab) <- c(" Mean ", "St. Dev .", "N")
+stargazer (tab , type ="text")
+```
+# Problem 2
+Reproduce tables 1, 2, 3.
+
+### Prepare the data for tabulate
+```{r pressure, echo=TRUE}
+dialysis$for.profit <- dialysis$profit.status =="For Profit"
+dialysis$patient.years <- dialysis$patient.months/12
+dialysis$total.staff.prev <- panel.lag(dialysis$total.staff,dialysis$provfs,dialysis$year,lag=1)
+dialysis$staff.change <- dialysis$total.staff - dialysis$total.staff.prev
+dialysis$zero.net.hiring <- dialysis$staff.change == 0
+dialysis$net.hiring <- 0
+crit <- dialysis$staff.change != 0
+crit[is.na(crit)] <- FALSE
+dialysis$net.hiring[crit] <- dialysis$staff.change[crit]
+
+dialysis$stations.prev <- panel.lag(dialysis$stations,dialysis$provfs,dialysis$year,lag=1)
+dialysis$station.change <- dialysis$stations - dialysis$stations.prev
+dialysis$zero.net.investment <- dialysis$station.change == 0
+dialysis$net.investment <- 0
+crit <- dialysis$station.change != 0
+crit[is.na(crit)] <- FALSE
+dialysis$net.investment[crit] <- dialysis$station.change[crit]
+```
+
+
+
+### Table 1: Summary Statistics
+```{r}
+var.names <- c("patient.years", "total.staff","zero.net.hiring","net.hiring", 
+               "stations","zero.net.investment","net.investment", 
+               "pct.septic","std.mortality" ,"for.profit")
+tab1 <- t( apply(dialysis [, var.names ], 2,descriptive.statistic))
+colnames( tab1) <- c(" Mean ", "St. Dev .", "N")
+rownames(tab1) <- c("Patient Years","FTE Staff", "Net Hiring", "Zero Net Hiring", "Stations", "Zero Net Investment", "Net Investment", "Septic Infection Rate", "Excess Mortality", "For Profit")
+stargazer (tab1 , type ="text")
+```
+
+### Table 2: Potential Quality Drivers
+Data Processing: Use the center year, 2010
+```{r}
+# For time since last inspection
+dialysis$time.since.inspection <- dialysis$days.since.inspection / 365
+
+# For state inspection rate
+dialysis.center <- dialysis[dialysis$year==2010,]
+dialysis.state <- data.frame(data = dialysis.center$time.since.inspection [(!is.na(dialysis.center$time.since.inspection))] < 1 ,group=dialysis.center$state[!is.na(dialysis.center$time.since.inspection) ])
+
+state.inspection.rate <- ddply(dialysis.state,~group,summarize, mean = mean(data,na.rm=TRUE), N = length(data), sd = sd(data,na.rm=TRUE))
+map = setNames(as.vector(state.inspection.rate$mean),as.vector(state.inspection.rate$group))
+dialysis.center$inspect.rate.state  <- map[dialysis.center$state]
+
+
+# For city level competitors
+dialysis.city <- data.frame(data = dialysis.center$patient.months,group = dialysis.center$city)
+
+city.competitors <- ddply(dialysis.city,~group,summarize, mean = mean(data,na.rm=TRUE), N = length(data), sd = sd(data,na.rm=TRUE))
+
+map = setNames(as.vector(city.competitors$N),as.vector(city.competitors$group))
+dialysis.center$city.compititors  <- map[dialysis.center$city]
+
+
+```
+
+Not able to find %  Patients  Referred  by  Nephrologist, because the data set didn't indicate the resource of the patients. In addition, cannot find the number of competitors in each HSA, use the number of competitors in each city instead.
+```{r}
+var.names <- c("inspect.rate.state", "time.since.inspection","city.compititors","for.profit")
+tab2 <- t( apply(dialysis.center [, var.names ], 2,descriptive.statistic))
+colnames( tab2) <- c(" Mean ", "St. Dev .", "N")
+rownames(tab2) <- c("State Inspection Rate","Time since inspection", "Compititors","For Profit")
+stargazer (tab2 , type ="text")
+
+```
+### Table 3: Patient Characteristics Summary Statis-tics
+
+```{r}
+var.names <- c("patient.age", "pct.female", "pct.fistula","comorbidities", "patient.esrd.years", "hemoglobin" )
+tab3 <- t( apply(dialysis.center [, var.names ], 2,descriptive.statistic))
+colnames( tab3) <- c(" Mean ", "St. Dev .", "N")
+rownames(tab3) <- c( "Patient Age", "Percentage Female", "Pct.  AV Fistula ","Avg.  Comorbid Conditions ","Avg.  Duration of ESRD", "Avg.  Hemoglobin Level "  )
+stargazer (tab3 , type ="text")
+
+```
+
+#Problem 3
+```{r warning=FALSE}
+
+p1 <- ggplot(dialysis,aes(x=stations,y=patient.months)) + geom_point()
+
+p2 <- ggplot(dialysis,aes(x=total.staff,y=patient.months)) + geom_point()
+
+p3 <- ggplot(dialysis,aes(x=total.staff,y=stations)) + geom_point()
+
+p4 <- ggplot(dialysis,aes(x=total.staff,y=pct.septic)) + geom_point()
+
+p5 <- ggplot(dialysis,aes(x=patient.months,y=pct.septic)) + geom_point()
+
+p6 <- ggplot(dialysis,aes(x=stations,y=pct.septic)) + geom_point()
+
+multiplot(p1,p2,p3,p4,p5,p6, cols=2)
+```
+
+#Problem 4
+```{r}
+
+dialysis$inspected.this.year <- 0
+dialysis$inspected.this.year[dialysis$time.since.inspection <= 1] <- 1
+inspection.rate <- aggregate(inspected.this.year ~ state * year, data = dialysis, FUN=mean)
+colnames(inspection.rate) <- c("state","year","state.year.inspection.rate")
+dialysis <- merge(x=dialysis,y=inspection.rate,by=c("year","state"))
+
+competitor.number <- aggregate(provfs ~ city * year, data = dialysis, FUN=length)
+colnames(competitor.number) <- c("city","year","city.year.competitor.number")
+dialysis <- merge(x=dialysis,y=competitor.number,by=c("year","city"))
+dialysis$competitor.1 <- as.numeric(dialysis$city.year.competitor.number == 2)
+dialysis$competitor.2 <- as.numeric(dialysis$city.year.competitor.number == 3)
+dialysis$competitor.3 <- as.numeric(dialysis$city.year.competitor.number >= 4)
+
+dialysis$DaVita <- as.numeric(dialysis$chain.name == "DAVITA")
+dialysis$Fresenius <-  as.numeric(dialysis$chain.name == "FRESENIUS MEDICAL CARE (FMC)")
+dialysis$Fresenius[dialysis$chain.name ==  "FRESENIUS MEDICAL CARE" ] = 1
+
+dialysis$non.profit <- 1 - dialysis$for.profit
+# ggplot(data = competitor.number, aes(x=city,y=city.year.competitor.number,color=year)) + geom_point() + theme_minimal()
+```
+
+Reproduce the result in table 4. There is no referral data available, so column 3 cannot be replicated. 
+Also, I cannot find indicators for HSA. City seems to be a good approximation. I'll just use city instead. 
+In the regression model, The effect of being non-profit is positive. This is different than the paper. The reason is not sure.
+```{r}
+
+tab4.col1 <- plm(pct.septic ~ I(days.since.inspection/365) + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index="provfs")
+
+tab4.col2 <- plm(pct.septic ~ state.year.inspection.rate + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index="provfs")
+
+tab4.col4 <- plm(pct.septic ~ competitor.1 + competitor.2 + competitor.3 + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index="provfs")
+
+
+tab4.col5 <- plm(pct.septic ~  I(days.since.inspection/365) + state.year.inspection.rate + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index="provfs")
+
+tab4.col6 <- plm(pct.septic ~  I(days.since.inspection/365) + state.year.inspection.rate +  competitor.1 + competitor.2 + competitor.3  + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index="provfs")
+
+
+tab4.col7 <- lm(pct.septic ~  non.profit  + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis )
+
+tab4.col8 <- lm(pct.septic ~  non.profit + DaVita + Fresenius + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis )
+
+
+tab4.col9 <- lm(pct.septic ~ I(days.since.inspection/365) + state.year.inspection.rate +  competitor.1 + competitor.2 + competitor.3 + non.profit + DaVita + Fresenius + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis )
+
+stargazer(tab4.col1,tab4.col2, type="text",title="Results",align=TRUE)
+stargazer(tab4.col4, tab4.col5, tab4.col6, type="text",title="Results",align=TRUE)
+stargazer(tab4.col7, tab4.col8,tab4.col9,type="text",title="Results",align=TRUE)
+```
+
+
+#Question 5
+
+### Table 5: Transformation and Production Estimates
+```{r}
+tab5.col2 <- lm(patient.years ~ stations + total.staff , data=dialysis)
+tab5.col3 <- plm(patient.years ~ stations + total.staff + provfs, data=dialysis,index="provfs" )
+
+tab5.col5 <- lm(patient.years ~ pct.septic + stations + total.staff, data=dialysis)
+tab5.col6 <- plm(patient.years ~ pct.septic + stations + total.staff , data=dialysis,index="provfs" )
+
+```

@@ -131,6 +131,8 @@ library(ggplot2)
 library(ggthemes)
 library(plotly)
 library(plm)
+library(AER) #IV Regression
+library(np) #Local Polynomial
 load(&quot;dialysisFacilityReports.Rdata&quot;) 
 source(&quot;functions.R&quot;)</code></pre>
 <div id="problem-1" class="section level1">
@@ -338,12 +340,12 @@ tab4.col5 &lt;- plm(pct.septic ~  I(days.since.inspection/365) + state.year.insp
 tab4.col6 &lt;- plm(pct.septic ~  I(days.since.inspection/365) + state.year.inspection.rate +  competitor.1 + competitor.2 + competitor.3  + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index=&quot;provfs&quot;)
 
 
-tab4.col7 &lt;- plm(pct.septic ~  non.profit  + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index=&quot;provfs&quot;)
+tab4.col7 &lt;- lm(pct.septic ~  non.profit  + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis )
 
-tab4.col8 &lt;- plm(pct.septic ~  non.profit + DaVita + Fresenius + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index=&quot;provfs&quot;)
+tab4.col8 &lt;- lm(pct.septic ~  non.profit + DaVita + Fresenius + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis )
 
 
-tab4.col9 &lt;- plm(pct.septic ~ I(days.since.inspection/365) + state.year.inspection.rate +  competitor.1 + competitor.2 + competitor.3 + non.profit + DaVita + Fresenius + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis,index=&quot;provfs&quot;)
+tab4.col9 &lt;- lm(pct.septic ~ I(days.since.inspection/365) + state.year.inspection.rate +  competitor.1 + competitor.2 + competitor.3 + non.profit + DaVita + Fresenius + patient.age + pct.female + patient.esrd.years + pct.fistula + comorbidities + hemoglobin, data=dialysis )
 
 stargazer(tab4.col1,tab4.col2, type=&quot;text&quot;,title=&quot;Results&quot;,align=TRUE)</code></pre>
 <pre><code>## 
@@ -437,64 +439,153 @@ stargazer(tab4.col1,tab4.col2, type=&quot;text&quot;,title=&quot;Results&quot;,a
 <pre class="r"><code>stargazer(tab4.col7, tab4.col8,tab4.col9,type=&quot;text&quot;,title=&quot;Results&quot;,align=TRUE)</code></pre>
 <pre><code>## 
 ## Results
-## =============================================================================================================
-##                                                            Dependent variable:                               
-##                              --------------------------------------------------------------------------------
-##                                                                 pct.septic                                   
-##                                         (1)                        (2)                        (3)            
-## -------------------------------------------------------------------------------------------------------------
-## I(days.since.inspection/365)                                                                0.097***         
-##                                                                                             (0.017)          
-##                                                                                                              
-## state.year.inspection.rate                                                                   -0.360          
-##                                                                                             (0.255)          
-##                                                                                                              
-## competitor.1                                                                                -0.375**         
-##                                                                                             (0.179)          
-##                                                                                                              
-## competitor.2                                                                               -0.625***         
-##                                                                                             (0.233)          
-##                                                                                                              
-## competitor.3                                                                               -0.945***         
-##                                                                                             (0.269)          
-##                                                                                                              
-## non.profit                             0.775*                    0.860**                    0.853**          
-##                                       (0.408)                    (0.410)                    (0.411)          
-##                                                                                                              
-## DaVita                                                           0.448**                    0.460**          
-##                                                                  (0.227)                    (0.227)          
-##                                                                                                              
-## Fresenius                                                         0.043                      0.073           
-##                                                                  (0.211)                    (0.211)          
-##                                                                                                              
-## patient.age                          -0.137***                  -0.137***                  -0.140***         
-##                                       (0.015)                    (0.015)                    (0.015)          
-##                                                                                                              
-## pct.female                             0.009*                     0.009*                     0.009*          
-##                                       (0.005)                    (0.005)                    (0.005)          
-##                                                                                                              
-## patient.esrd.years                   -0.135***                  -0.137***                  -0.134***         
-##                                       (0.045)                    (0.045)                    (0.046)          
-##                                                                                                              
-## pct.fistula                          -0.088***                  -0.089***                  -0.091***         
-##                                       (0.003)                    (0.003)                    (0.003)          
-##                                                                                                              
-## comorbidities                         0.893***                   0.891***                   0.903***         
-##                                       (0.045)                    (0.045)                    (0.046)          
-##                                                                                                              
-## hemoglobin                            0.178***                   0.180***                   0.179***         
-##                                       (0.045)                    (0.045)                    (0.045)          
-##                                                                                                              
-## -------------------------------------------------------------------------------------------------------------
-## Observations                           38,405                     38,405                     38,180          
-## R2                                     0.032                      0.032                      0.034           
-## Adjusted R2                            -0.159                     -0.159                     -0.157          
-## F Statistic                  150.947*** (df = 7; 32081) 117.846*** (df = 9; 32079) 81.258*** (df = 14; 31874)
-## =============================================================================================================
-## Note:                                                                             *p&lt;0.1; **p&lt;0.05; ***p&lt;0.01</code></pre>
+## ==============================================================================================================
+##                                                             Dependent variable:                               
+##                              ---------------------------------------------------------------------------------
+##                                                                 pct.septic                                    
+##                                         (1)                        (2)                         (3)            
+## --------------------------------------------------------------------------------------------------------------
+## I(days.since.inspection/365)                                                                0.068***          
+##                                                                                              (0.016)          
+##                                                                                                               
+## state.year.inspection.rate                                                                   -0.236           
+##                                                                                              (0.231)          
+##                                                                                                               
+## competitor.1                                                                                 0.200**          
+##                                                                                              (0.084)          
+##                                                                                                               
+## competitor.2                                                                                 -0.017           
+##                                                                                              (0.103)          
+##                                                                                                               
+## competitor.3                                                                                 0.120*           
+##                                                                                              (0.069)          
+##                                                                                                               
+## non.profit                           -0.773***                  -0.929***                   -0.909***         
+##                                       (0.079)                    (0.088)                     (0.088)          
+##                                                                                                               
+## DaVita                                                            -0.034                     -0.040           
+##                                                                  (0.074)                     (0.074)          
+##                                                                                                               
+## Fresenius                                                       -0.459***                   -0.446***         
+##                                                                  (0.073)                     (0.073)          
+##                                                                                                               
+## patient.age                          -0.057***                  -0.056***                   -0.055***         
+##                                       (0.006)                    (0.006)                     (0.006)          
+##                                                                                                               
+## pct.female                            0.020***                   0.021***                   0.020***          
+##                                       (0.003)                    (0.003)                     (0.003)          
+##                                                                                                               
+## patient.esrd.years                   -0.086***                  -0.074***                   -0.095***         
+##                                       (0.028)                    (0.029)                     (0.029)          
+##                                                                                                               
+## pct.fistula                          -0.103***                  -0.104***                   -0.106***         
+##                                       (0.002)                    (0.002)                     (0.002)          
+##                                                                                                               
+## comorbidities                         1.885***                   1.894***                   1.908***          
+##                                       (0.033)                    (0.033)                     (0.034)          
+##                                                                                                               
+## hemoglobin                            0.322***                   0.315***                   0.317***          
+##                                       (0.043)                    (0.043)                     (0.043)          
+##                                                                                                               
+## Constant                              8.096***                   8.211***                   8.161***          
+##                                       (0.621)                    (0.622)                     (0.641)          
+##                                                                                                               
+## --------------------------------------------------------------------------------------------------------------
+## Observations                           38,405                     38,405                     38,180           
+## R2                                     0.131                      0.132                       0.134           
+## Adjusted R2                            0.131                      0.132                       0.134           
+## Residual Std. Error              5.489 (df = 38397)         5.485 (df = 38395)         5.470 (df = 38165)     
+## F Statistic                  828.589*** (df = 7; 38397) 650.560*** (df = 9; 38395) 423.196*** (df = 14; 38165)
+## ==============================================================================================================
+## Note:                                                                              *p&lt;0.1; **p&lt;0.05; ***p&lt;0.01</code></pre>
 </div>
 <div id="question-5" class="section level1">
 <h1>Question 5</h1>
+<div id="table-5-transformation-and-production-estimates" class="section level3">
+<h3>Table 5: Transformation and Production Estimates</h3>
+<pre class="r"><code>tab5.col5 &lt;- lm(patient.years ~ stations + total.staff , data=dialysis)
+tab5.col6 &lt;- plm(patient.years ~ stations + total.staff , data=dialysis,index=&quot;provfs&quot; )
+
+tab5.col2 &lt;- lm(patient.years ~ pct.septic + stations + total.staff, data=dialysis)
+tab5.col3 &lt;- plm(patient.years ~ pct.septic + stations + total.staff , data=dialysis,index=&quot;provfs&quot; )
+
+
+stargazer(tab5.col2,tab5.col3, type=&quot;text&quot;,title=&quot;Results With Quality&quot;,align=TRUE)</code></pre>
+<pre><code>## 
+## Results With Quality
+## ==============================================================================
+##                                        Dependent variable:                    
+##                     ----------------------------------------------------------
+##                                           patient.years                       
+##                                  OLS                         panel            
+##                                                              linear           
+##                                  (1)                          (2)             
+## ------------------------------------------------------------------------------
+## pct.septic                    0.336***                      0.256***          
+##                                (0.018)                      (0.015)           
+##                                                                               
+## stations                      2.156***                      0.404***          
+##                                (0.017)                      (0.029)           
+##                                                                               
+## total.staff                   2.522***                      0.879***          
+##                                (0.015)                      (0.015)           
+##                                                                               
+## Constant                     -14.166***                                       
+##                                (0.327)                                        
+##                                                                               
+## ------------------------------------------------------------------------------
+## Observations                   42,976                        42,976           
+## R2                              0.730                        0.096            
+## Adjusted R2                     0.730                        -0.066           
+## Residual Std. Error      22.252 (df = 42972)                                  
+## F Statistic         38,780.750*** (df = 3; 42972) 1,285.796*** (df = 3; 36440)
+## ==============================================================================
+## Note:                                              *p&lt;0.1; **p&lt;0.05; ***p&lt;0.01</code></pre>
+<pre class="r"><code>stargazer(tab5.col5,tab5.col6, type=&quot;text&quot;,title=&quot;Results Without Quality&quot;,align=TRUE)</code></pre>
+<pre><code>## 
+## Results Without Quality
+## ==============================================================================
+##                                        Dependent variable:                    
+##                     ----------------------------------------------------------
+##                                           patient.years                       
+##                                  OLS                         panel            
+##                                                              linear           
+##                                  (1)                          (2)             
+## ------------------------------------------------------------------------------
+## stations                      2.208***                      0.455***          
+##                                (0.017)                      (0.029)           
+##                                                                               
+## total.staff                   2.492***                      0.874***          
+##                                (0.015)                      (0.015)           
+##                                                                               
+## Constant                     -11.102***                                       
+##                                (0.261)                                        
+##                                                                               
+## ------------------------------------------------------------------------------
+## Observations                   44,206                        44,206           
+## R2                              0.726                        0.089            
+## Adjusted R2                     0.726                        -0.073           
+## Residual Std. Error      22.566 (df = 44203)                                  
+## F Statistic         58,656.280*** (df = 2; 44203) 1,827.716*** (df = 2; 37525)
+## ==============================================================================
+## Note:                                              *p&lt;0.1; **p&lt;0.05; ***p&lt;0.01</code></pre>
+</div>
+</div>
+<div id="question-6" class="section level1">
+<h1>Question 6</h1>
+<pre class="r"><code>dialysis$quality &lt;- - residuals(lm(pct.septic ~ pct.fistula + pct.female + patient.age + patient.esrd.years + hemoglobin + comorbidities, data = dialysis, na.action = na.exclude))
+
+inc &lt;- with(dialysis, stations &gt; 0 &amp; total.staff &gt; 0 &amp; net.hiring != 0 &amp; !is.na(stations) &amp; ! is.na(total.staff) &amp; !is.na(net.hiring) &amp; (net.investment == 0) &amp; ! is.na(std.mortality))
+
+iv1 &lt;- ivreg(log(patient.months) ~ quality + poly(log(stations), log(total.staff),net.hiring,degree=2)*I(net.hiring &gt; 0) | log(std.mortality + .01) + poly(log(stations), log(total.staff),net.hiring,degree=2)*I(net.hiring &gt; 0), data=subset(dialysis,inc),na.action=&quot;na.exclude&quot;)
+
+alpha &lt;- coef(iv1)[&quot;quality&quot;]
+Phi.step1 &lt;- predict(iv1) - alpha*subset(dialysis,inc)$quality
+dialysis$Phi &lt;- NA
+dialysis[names(Phi.step1),&quot;Phi&quot;] &lt;- Phi.step1</code></pre>
+</div>
+<div id="question-7" class="section level1">
+<h1>Question 7</h1>
 </div>
 
 

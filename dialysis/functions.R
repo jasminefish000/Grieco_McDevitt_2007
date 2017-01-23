@@ -10,6 +10,7 @@
 #' values are desired.
 #' @return Lagged copy of x.
 panel.lag <- function(x, i, t, lag=1) {
+  
   if (!identical(order(i,t),1:length(i))) {
     stop("inputs not sorted.")
   }

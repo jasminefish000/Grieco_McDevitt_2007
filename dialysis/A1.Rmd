@@ -18,6 +18,9 @@ library(ggplot2)
 library(ggthemes)
 library(plotly)
 library(plm)
+library(AER) #IV Regression
+library(np) #Local Polynomial
+library(nloptr)
 load("dialysisFacilityReports.Rdata") 
 source("functions.R")
 ```
@@ -184,14 +187,54 @@ stargazer(tab4.col7, tab4.col8,tab4.col9,type="text",title="Results",align=TRUE)
 ```
 
 
-#Question 5
+# Question 5
 
 ### Table 5: Transformation and Production Estimates
 ```{r}
-tab5.col2 <- lm(patient.years ~ stations + total.staff , data=dialysis)
-tab5.col3 <- plm(patient.years ~ stations + total.staff + provfs, data=dialysis,index="provfs" )
+tab5.col5 <- lm(patient.years ~ stations + total.staff , data=dialysis)
+tab5.col6 <- plm(patient.years ~ stations + total.staff , data=dialysis,index="provfs" )
 
-tab5.col5 <- lm(patient.years ~ pct.septic + stations + total.staff, data=dialysis)
-tab5.col6 <- plm(patient.years ~ pct.septic + stations + total.staff , data=dialysis,index="provfs" )
+tab5.col2 <- lm(patient.years ~ pct.septic + stations + total.staff, data=dialysis)
+tab5.col3 <- plm(patient.years ~ pct.septic + stations + total.staff , data=dialysis,index="provfs" )
 
+
+stargazer(tab5.col2,tab5.col3, type="text",title="Results With Quality",align=TRUE)
+stargazer(tab5.col5,tab5.col6, type="text",title="Results Without Quality",align=TRUE)
+
+```
+
+
+# Question 6
+
+```{r IV Regression}
+dialysis$quality <- - residuals(lm(pct.septic ~ pct.fistula + pct.female + patient.age + patient.esrd.years + hemoglobin + comorbidities, data = dialysis, na.action = na.exclude))
+
+inc <- with(dialysis, stations > 0 & total.staff > 0 & net.hiring != 0 & !is.na(stations) & ! is.na(total.staff) & !is.na(net.hiring) & (net.investment == 0) & ! is.na(std.mortality))
+
+iv1 <- ivreg(log(patient.months) ~ quality + poly(log(stations), log(total.staff),net.hiring,degree=2)*I(net.hiring > 0) | log(std.mortality + .01) + poly(log(stations), log(total.staff),net.hiring,degree=2)*I(net.hiring > 0), data=subset(dialysis,inc),na.action="na.exclude")
+
+alpha <- coef(iv1)["quality"]
+Phi.step1 <- predict(iv1) - alpha*subset(dialysis,inc)$quality
+dialysis$Phi <- NA
+dialysis[names(Phi.step1),"Phi"] <- Phi.step1
+
+```
+
+# Question 7
+
+```{r}
+dialysis <- dialysis[order(dialysis$provfs,dialysis$year),]
+
+obj <- function(b){
+  bx <- with(dialysis,log(stations)*b[1] + log(total.staff)*b[2])
+  omega <- dialysis$Phi - bx
+  omega.lag <- panel.lag(omega, i = dialysis$provfs,t=dialysis$year)
+  yhat <- with(dialysis,log(patient.months) - alpha * quality -  bx)
+  
+  tmp <- subset(cbind(dialysis,yhat,omega.lag), is.finite(omega.lag) & is.finite(yhat))
+  eta <- residuals(lm(yhat ~ poly(omega.lag,degree=4),na.action="na.exclude",data=tmp))
+  return(sum(eta^2))
+}
+
+nloptr(x0=c(0.2,0.2),eval_f = obj , opts=list(algorithm="NLOPT_LN_BOBYQA",print_level=3))
 ```
